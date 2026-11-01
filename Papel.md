@@ -5,7 +5,7 @@
 - **Abstract**
 - **Keywords**
 
-## 1. Introduction
+## 1. Introduction: What is DroneCAN
 ### 1.1. Background: From Single Controllers to Distributed System
 
 A modern unmanned aerial vehicle (UAV) is no longer a single controller wired to a few actuators; it is a distributed embedded system in which several devices, each with its own processor, cooperate by exchanging data continuously during flight. A typical multirotor combines a flight controller. A typical multirotor combines a flight controller (the circuit board that runs the autopilot software) with one or more GNSS receivers (satellite-navigation receivers such as GPS), a magnetometer (compass), an airspeed sensor, a rangefinder, several electronic speed controllers (ESCs, circuits that regulate motor speed), a battery monitor and, optionally, a companion computer (an additional computer for high-level tasks such as image processing). The DroneCAN specification describes the processors in such systems as ranging from high-performance on-board computers to extremely resource-constrained microcontrollers [1], and the devices often come from different vendors, which is why the same specification stresses inter-vendor compatibility [11].
@@ -36,8 +36,20 @@ DroneCAN is one of several communication technologies available to UAV designers
 
 UAVCAN was the original open protocol for CAN-based communication between the components of a vehicle. In 2022 the project split in two: UAVCAN v0 was renamed DroneCAN, and UAVCAN v1 was renamed Cyphal [13]. The two descendants share design goals, such as a network without a master node and both publish/subscribe and request/response communication [1], [15], but they define different CAN frame formats [4], [15] and are therefore separate protocols, not versions of one another. Publications that predate the split and use the name UAVCAN, such as [19], refer to what is now DroneCAN. MAVLink is independent of this lineage: it connects the vehicle with ground stations and companion computers, not the components inside the vehicle [16], [18], and it meets DroneCAN only where DroneCAN frames are carried inside MAVLink 2 messages [6].
 
-## II. Communication Interfaces in Aerial and Robotic Platforms
-- A. Architecture of a Typical UAV
+## 2. Communication in UAVs: Why we need DroneCAN
+### 2.1. Architecture of UAV
+The core of a UAV is the flight controller (FC), which communicates with the surrounding devices to exchange data and commands. The flight controller hardware runs the autopilot, that is, flight stack software on a real-time operating system (RTOS), which stabilises the vehicle and carries out commands and missions [14]. The surrounding devices fall into four groups: sensors, actuators, the power supply, and links to the pilot and to other computers.
+
+The flight controller uses outputs to drive actuators: motors, flight surfaces such as ailerons and flaps, and payloads such as camera triggers or grippers [14]. A motor is driven through an *electronic speed controller* (ESC), which converts the signal from the flight controller into the appropriate level of power for the motor [14].
+
+The vehicle is usually powered by a lithium-polymer battery connected through a power module, which supplies the flight controller and the ESCs separately [14].
+
+The vehicle also communicates with the pilot and with other computers. A pilot can fly the vehicle with a radio control (RC) transmitter and a receiver on the vehicle [14]. A *ground control station* (GCS), such as QGroundControl, communicates with the vehicle through a *telemetry radio*, a bidirectional wireless data link [14].
+
+Fig. 1 shows the main communication links of the flight controller. Actuators and sensor modules such as the GNSS module are attached directly to dedicated ports of the controller, and the outputs can also be DroneCAN nodes, for example DroneCAN motor controllers [14]. The ground station and the companion computer are reached through links such as the telemetry radio, a serial cable, an Ethernet cable or Wi-Fi [14].
+
+![Fig. 1](Figuras/Figura_1.svg)
+*Fig. 1. Typical communication links around a flight controller.
 - B. Point-to-Point Interfaces (PWM, UART, I2C, SPI)
 - C. Higher-Level Links: MAVLink
 - D. Summary of Requirements

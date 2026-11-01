@@ -7,7 +7,6 @@
 
 ## 1. Introduction: What is DroneCAN
 ### 1.1. Background: From Single Controllers to Distributed System
-
 A modern unmanned aerial vehicle (UAV) is no longer a single controller wired to a few actuators; it is a distributed embedded system in which several devices, each with its own processor, cooperate by exchanging data continuously during flight. A typical multirotor combines a flight controller. A typical multirotor combines a flight controller (the circuit board that runs the autopilot software) with one or more GNSS receivers (satellite-navigation receivers such as GPS), a magnetometer (compass), an airspeed sensor, a rangefinder, several electronic speed controllers (ESCs, circuits that regulate motor speed), a battery monitor and, optionally, a companion computer (an additional computer for high-level tasks such as image processing). The DroneCAN specification describes the processors in such systems as ranging from high-performance on-board computers to extremely resource-constrained microcontrollers [1], and the devices often come from different vendors, which is why the same specification stresses inter-vendor compatibility [11].
 
 he conventional approach to connecting these devices is *point-to-point wiring*, in which each device is attached to the flight controller through a dedicated port and cable, using the interface that the device provides. This arrangement is simple to implement, but it has three limitations. First, the number of ports is determined by the hardware and therefore bounds the number of actuators and sensors that a vehicle can carry. Second, each interface type requires its own cabling and driver, which increases the weight, the number of connectors and the number of potential points of failure. Third, these interfaces do not provide common services such as device discovery, status monitoring or firmware update.
@@ -15,7 +14,6 @@ he conventional approach to connecting these devices is *point-to-point wiring*,
 Communication faults can have severe consequences: the loss of the link between a sensor and the flight controller can result in the loss of the vehicle, damage to property or injury to people. The communication subsystem must therefore tolerate electrical noise and recover from transmission errors, properties that the Controller Area Network (CAN) provides through differential wiring and built-in error handling [19], [20]. The DroneCAN specification adds further requirements: a network without a master node, support for redundant interfaces and redundant nodes, and low-latency, high-throughput communication [1].
 
 ### 1.2. ArduPilot and PX4
-
 An autopilot is an embedded computer that runs the software providing control and guidance of an unmanned vehicle. Its key tasks include stabilising attitude and heading, flying missions along waypoints, triggering failsafe actions (predefined reactions to faults, such as returning to the launch point) and connecting to ground control stations [18].
 
 ArduPilot is open-source autopilot software that originated in 2007 in the DIY Drones community as an offshoot of the Arduino project. It was initially designed as monolithic software (a single program) and later moved to the ChibiOS real-time operating system (RTOS) [18].
@@ -25,13 +23,11 @@ PX4 is open-source autopilot software that originated in 2008 at ETH Zurich. It 
 Both projects use the MAVLink protocol as the primary protocol for communication with ground stations [18], whereas communication between onboard components relies on CAN: PX4 uses UAVCAN [18], and ArduPilot uses CAN for high-speed communication between components such as GNSS units, sensors and controllers [18]. UAVCAN version 0 has since been renamed DroneCAN, which is now the primary CAN protocol used by ArduPilot and PX4 to communicate with CAN peripherals [12], [13].
 
 ### 1.3. **From CAN to DroneCAN**
-
 The Controller Area Network (CAN) was developed by Bosch for the automotive industry to replace complex wiring harnesses with a two-wire bus, that is, a shared communication line to which all devices are connected [19], [20]. It is a multi-master, message-broadcast system with a maximum signalling rate of about 1 Mbit/s that offers immunity to electrical noise and the ability to detect and recover from errors [19], [20]. CAN is standardised in the ISO 11898 series [1], which covers only the physical and data-link layers: it specifies how bits are signalled on the bus and how frames are transmitted, but not how applications name data, assign node addresses, split large data structures across frames or discover other devices. These functions are provided by a higher-layer protocol that runs on top of CAN. In industrial automation this role is filled by protocols such as CANopen, in heavy road vehicles by SAE J1939, in aircraft by ARINC 825, and in unmanned aerial vehicles by DroneCAN. Without such a protocol, each vendor would invent its own conventions and interoperability would be lost.
 
 DroneCAN is an application-level protocol of this kind for aerospace and robotic applications. The DroneCAN specification describes it as a lightweight protocol designed to provide a highly reliable communication method for aerospace and robotic applications via the CAN bus [2]. Devices on the bus, called nodes, form a decentralised peer network in which every node has a unique numeric identifier [2]. Nodes exchange data either as broadcast messages that any interested node can receive (publish/subscribe) or as one-to-one requests and responses (services), and the formats of both are written in a text-based data structure description language [3]. On top of this, the protocol defines standard functions such as node status monitoring, node discovery, time synchronisation, parameter configuration, firmware update and dynamic node ID allocation [9]. DroneCAN is the primary CAN protocol used by the ArduPilot and PX4 projects to communicate with CAN peripherals, and it was created to continue the development of the widely used UAVCAN v0 protocol [12]. The PX4 documentation recommends DroneCAN for most common CAN setups [13].
 
 ### 1.4. **Related Protocols and Their Relationships**
-
 DroneCAN is one of several communication technologies available to UAV designers. MAVLink (Micro Air Vehicle Link) is a lightweight messaging protocol for communication between unmanned systems and ground stations and between autopilots and companion computers. Cyphal is a transport-independent protocol whose primary transport is CAN FD, an extension of CAN for larger frames and higher data rates [15].
 
 UAVCAN was the original open protocol for CAN-based communication between the components of a vehicle. In 2022 the project split in two: UAVCAN v0 was renamed DroneCAN, and UAVCAN v1 was renamed Cyphal [13]. The two descendants share design goals, such as a network without a master node and both publish/subscribe and request/response communication [1], [15], but they define different CAN frame formats [4], [15] and are therefore separate protocols, not versions of one another. Publications that predate the split and use the name UAVCAN, such as [19], refer to what is now DroneCAN. MAVLink is independent of this lineage: it connects the vehicle with ground stations and companion computers, not the components inside the vehicle [16], [18], and it meets DroneCAN only where DroneCAN frames are carried inside MAVLink 2 messages [6].
@@ -48,11 +44,41 @@ The vehicle also communicates with the pilot and with other computers. A pilot c
 
 Fig. 1 shows the main communication links of the flight controller. Actuators and sensor modules such as the GNSS module are attached directly to dedicated ports of the controller, and the outputs can also be DroneCAN nodes, for example DroneCAN motor controllers [14]. The ground station and the companion computer are reached through links such as the telemetry radio, a serial cable, an Ethernet cable or Wi-Fi [14].
 
-![Fig. 1](Figuras/Figura_1.svg)
-*Fig. 1. Typical communication links around a flight controller.
-- B. Point-to-Point Interfaces (PWM, UART, I2C, SPI)
-- C. Higher-Level Links: MAVLink
-- D. Summary of Requirements
+Fig. 1. Typical communication links around a flight controller.
+
+### 2.2. Point-to-Point Interfaces (PWM, UART, I2C, SPI)
+The traditional way to connect devices to a flight controller is to give each device its own dedicated interface on the controller, chosen to suit the kind of data that the device exchanges. These interfaces are hardware interfaces and signalling methods rather than application-level protocols: they define how electrical signals on the wires represent data, but not what the data mean. Four are in common use. Pulse-width modulation (PWM) sends a setpoint to an actuator over a single wire. A UART (universal asynchronous receiver-transmitter) is a serial link between two devices. I2C and SPI are short-distance serial buses on which the controller communicates with several peripheral chips or modules over shared wires. PWM and UART therefore connect exactly two devices, whereas I2C and SPI share wires among several, but in all four cases the connection is local to the controller’s own ports, and no common addressing or services extend across the vehicle.
+
+PWM is the simplest of them and is used for actuators. It encodes a setpoint, such as the desired motor speed, in the width of the pulses of a periodic signal, so one wire carries one setpoint in one direction, from the controller to one actuator. The output connectors of the controller are called ports, in PX4 they are MAIN and AUX[14]. The number of outputs is fixed by the hardware, typically six to eight [14].
+
+The serial interfaces suit devices that exchange data rather than receive a single setpoint. UART links are used for telemetry radios and companion computers [14], whereas I2C and SPI are used for sensors and other peripherals located close to the controller, SPI being the faster of the two. All three are simple and widely supported. Their main limit is range: I2C and SPI are designed for short connections, and a UART connects only two devices.
+
+Point-to-point wiring therefore has three limitations:
+
+- The number of ports is fixed by the hardware [14], so each additional device needs another port and another cable.
+- Each interface type needs its own driver and cabling.
+- The interfaces define no common services such as device discovery, status monitoring or firmware update [9].
+
+### 2.3. MAVLink: Communication Between the Vehicle and Other Computers
+The interfaces described above connect individual devices to the flight controller. MAVLink addresses a different problem: communication between the vehicle and the other computers that supervise or assist it, namely the ground control station and the companion computer [16], [18]. The point-to-point interfaces thus serve communication between the flight controller and the devices inside the vehicle, whereas MAVLink serves communication between the vehicle and other computers. DroneCAN belongs to the first of these two problems: it connects the flight controller and the onboard devices over a shared CAN bus [12], [19].
+
+### 2.4. Summary of Requirements
+The limitations of point-to-point wiring lead directly to the following requirements for an intra-vehicle bus:
+
+- a shared medium to which many devices connect through one interface, so that the number of devices is not limited by the number of controller ports and each additional device does not need another cable;
+- one interface and one type of cabling for all device types, so that a single driver serves every device;
+- standard definitions of the high-level functions common to all nodes, such as discovery, status monitoring, configuration and firmware update.
+
+Using such a bus for the control of a vehicle on small embedded hardware adds further requirements:
+
+- no single point of failure, and therefore no bus master (a node that controls access for all others);
+- support for redundant interfaces and redundant nodes;
+- low latency and high throughput for hard real-time control loops, that is, control loops that must meet strict timing deadlines;
+- a simple way to exchange payloads that exceed a single frame;
+- low computational requirements, down to resource-constrained microcontrollers;
+- an open specification with open reference implementations.
+
+These requirements lead to the design goals and philosophy of DroneCAN [1].
 
 ## III. Overview of the DroneCAN Protocol Stack
 - A. Design Goals

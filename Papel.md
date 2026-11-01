@@ -102,24 +102,75 @@ The application layer defines the data structures of messages and services in th
 
 The following chapters describe these layers in detail, starting with CAN.
 
-## IV. CAN: Physical and Data-Link Layers
-### A. Basic Concepts of CAN
-### B. Physical Layer
-#### 1. Bus Lines and Differential Signalling
-#### 2. Bit Encoding and Bit Stuffing
-#### 3. Synchronisation and Bit Timing
-#### 4. Bit Rate and Bus Length
-### C. Data-Link Layer
-#### 1. Bus Access and Arbitration
-#### 2. Frame Formats
-#### 3. Error Detection
-#### 4. Error Handling and Fault Confinement
-### D. CAN FD and Other Protocol Versions
-### E. DroneCAN Hardware Recommendations
-#### 1. Connectors
-#### 2. Bus Power and Overcurrent Protection
-#### 3. Redundant CAN Interfaces and Bus Topology
-#### 4. Recommended Bit Rates and Automatic Bit-Rate Detection
+## 4. CAN: Physical and Data-Link Layers
+### 4.1. Overview of CAN
+CAN (Controller Area Network) es un bus serie en el que todos los nodos están conectados en paralelo a un mismo par de cables. Una trama de datos no contiene la dirección del emisor ni la del receptor: el identificador indica el contenido de la trama. Cada nodo del bus usa el identificador para decidir si la trama le interesa. Por eso, al conectar o desconectar un nodo no hace falta reconfigurar los demás.
+
+CAN no tiene nodo maestro: cuando el bus está libre, cualquier nodo puede transmitir. Si varios nodos transmiten a la vez, el identificador también indica la prioridad, y el nodo con mayor prioridad sigue transmitiendo. El nodo que pierde el arbitraje espera y vuelve a enviar su trama más tarde.
+
+Sin embargo, CAN solo define cómo se transmiten las tramas, no su significado. No define cómo se asignan los identificadores, cómo se envían datos de más de 8 bytes, ni cómo se identifica un nodo o se configura la red. Todo esto lo resuelven protocolos de capas superiores, por ejemplo una capa de aplicación.
+
+### 4.2. Capa física
+#### 4.2.1. Estructura del bus y señalización
+CAN usa un bus lineal: todos los nodos están conectados en paralelo a una misma línea lógica. Esta línea tiene dos estados: dominante (bit 0) y recesivo (bit 1). Si al menos un nodo transmite un bit dominante, el bus queda en estado dominante. Por tanto, el valor del bus es el AND de los valores que los nodos quieren transmitir en ese instante. Por eso, cada nodo compara el bit que envía con el bit que hay en el bus y, según la prioridad, arbitra el orden de transmisión.
+
+El medio físico más usado es un par trenzado de dos cables, llamados CAN_H y CAN_L. El receptor mide la diferencia de tensión entre los dos cables. Una interferencia electromagnética afecta casi por igual a los dos cables, así que la diferencia casi no cambia. Por eso la transmisión diferencial resiste bien las interferencias.
+
+#### 4.2.2. Codificación y temporización del bit
+CAN no tiene una línea de reloj: cada nodo usa su propio oscilador y mide por su cuenta el tiempo de cada bit. Como los osciladores no son idénticos, el reloj de un receptor se desvía poco a poco del reloj del emisor. Para corregir esta desviación, el receptor usa los cambios de nivel del bus como referencia.
+
+CAN codifica los bits con NRZ: como una secuencia larga de bits iguales no produce ningún cambio de nivel, y el receptor no puede corregir su reloj. Para evitarlo, CAN usa relleno de bits: después de cinco bits iguales seguidos, el emisor inserta un bit de valor contrario, y el receptor lo elimina. Así hay al menos un cambio de nivel cada seis bits.
+
+La sincronización se hace de dos maneras. Al comienzo de cada trama, todos los nodos se sincronizan con el primer cambio de recesivo a dominante (sincronización dura). Durante la trama, cada nuevo cambio de recesivo a dominante sirve para corregir el reloj otra vez (resincronización). Para ello, cada bit incluye un pequeño tiempo reservado para la propagación de la señal y para la corrección del reloj. Esta corrección continua evita que el error se acumule. Por eso CAN puede usar osciladores baratos, y esto hace que su coste sea bajo.
+
+### 4.3. Capa de enlace de datos
+#### 4.3.1. Acceso al bus y arbitraje
+Un nodo solo empieza a transmitir cuando el bus está libre. Si varios nodos empiezan a la vez, cada uno envía su identificador bit a bit, empezando por el bit más significativo, y compara cada bit enviado con el bit que lee en el bus. Si un nodo envía un bit recesivo (1) y lee un bit dominante (0), sabe que otro nodo tiene mayor prioridad. Entonces deja de transmitir, pasa a recibir la trama y lo vuelve a intentar cuando el bus esté libre. Como el bit dominante es el 0, el identificador con menor valor numérico tiene mayor prioridad. La trama ganadora no se destruye ni se retrasa. Para que el arbitraje funcione, un mismo identificador no puede ser enviado a la vez por dos nodos.
+
+#### 4.3.2. Formato de las tramas
+La trama de datos es la trama que transporta la información. Está formada por los siguientes campos: un bit de inicio, el campo de arbitraje (el identificador), el campo de control (que indica cuántos bytes de datos hay), el campo de datos, el campo CRC, el campo de confirmación (ACK) y los bits de fin de trama. El campo de datos tiene como máximo 8 bytes. Además, CAN define otras tramas: la trama remota, que pide a otro nodo que envíe una trama de datos, la trama de error y la trama de sobrecarga.
+
+El identificador puede tener 11 bits (formato estándar, CAN 2.0A) o 29 bits (formato extendido, CAN 2.0B). Un bit del campo de arbitraje indica cuál de los dos formatos se usa. DroneCAN usa el formato extendido de 29 bits.
+
+#### 4.3.3. Detección y gestión de errores
+CAN detecta cinco tipos de errores:
+
+- Error de bit: un nodo lee en el bus un valor distinto del que ha enviado (salvo durante el arbitraje y en el campo de confirmación).
+- Error de relleno: aparecen seis bits iguales seguidos.
+- Error de CRC: el CRC de 15 bits calculado por el receptor no coincide con el recibido.
+- Error de formato: un campo de formato fijo tiene un valor no permitido.
+- Error de confirmación: el emisor lee un bit recesivo en el campo de confirmación, es decir, ningún receptor ha recibido la trama correctamente. Los receptores que la reciben bien envían un bit dominante en ese campo.
+
+Cuando un nodo detecta un error, envía una trama de error, formada por seis bits dominantes. Esta secuencia rompe la regla del relleno de bits, por lo que todos los nodos detectan el error y descartan la trama. Después, el emisor la retransmite automáticamente.
+
+Para evitar que un nodo averiado perturbe el bus enviando tramas de error sin parar, CAN usa contadores de errores. Si los errores superan un límite, el nodo se aísla y se desconecta del bus (estado bus off).
+
+### 4.4. CAN FD y otras versiones del protocolo
+CAN ha evolucionado en varias versiones. CAN 2.0A usa identificadores de 11 bits. En redes con muchos tipos de mensajes y de nodos, los identificadores de CAN 2.0A no son suficientes. Por eso, CAN 2.0B añade el formato extendido, con identificadores de 29 bits (los 11 bits originales más 18 bits adicionales). Un bit de la trama indica cuál de los dos formatos se usa. Un nodo CAN 2.0B entiende los dos formatos, pero un nodo CAN 2.0A no entiende las tramas extendidas y las trata como errores.
+
+CAN FD (Flexible Data-rate) nace porque 8 bytes por trama y una velocidad máxima de 1 Mbit/s son pocos cuando aumenta la cantidad de datos. CAN FD permite hasta 64 bytes de datos por trama y transmite el campo de datos a mayor velocidad, mientras que el arbitraje mantiene la velocidad normal. DroneCAN usa CAN clásico y también puede usarse sobre CAN FD.
+
+### 4.5. Velocidad y longitud del bus en DroneCAN
+DroneCAN usa la capa física ISO 11898-2, también llamada CAN de alta velocidad. No impone una velocidad, pero recomienda usar solo cuatro, para garantizar la compatibilidad entre fabricantes. Cuanto mayor es la velocidad, más corto es el bit y menos tiempo tiene la señal para recorrer el bus, por lo que la longitud máxima disminuye [11]:
+
+| Velocidad (kbit/s) | Longitud máxima del bus | Longitud máxima de la derivación |
+| --- | --- | --- |
+| 1000 | 40 m | 0,3 m |
+| 500 | 100 m | 0,3 m |
+| 250 | 250 m | 0,3 m |
+| 125 | 500 m | 0,3 m |
+
+Estas longitudes suponen un retardo de propagación de 5 ns por metro, sin contar el retardo de los transceptores.
+
+### 4.6. Resumen: lo que DroneCAN hereda de CAN
+DroneCAN hereda de CAN las siguientes propiedades:
+
+- Varios maestros: cualquier nodo puede enviar sin esperar a un maestro, y la avería de un nodo no detiene la red.
+- Arbitraje por prioridad: los mensajes más importantes se envían primero.
+- Detección de errores y retransmisión automática: las tramas erróneas se descartan y se retransmiten, y un nodo averiado se desconecta solo del bus (bus off).
+- Difusión: cada trama llega a todos los nodos, por lo que quien envía un mensaje no necesita saber quién lo recibe.
+
+Sin embargo, CAN solo ofrece un transporte básico de tramas. Todo lo demás, como dividir los datos largos, asignar la prioridad y el significado a los identificadores y gestionar la red, lo aportan las capas superiores de DroneCAN, es decir, la capa de transporte y la capa de aplicación.
 
 ## V. DroneCAN Transport Layer
 ### A. Transfer Types: Message, Anonymous and Service

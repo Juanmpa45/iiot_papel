@@ -81,7 +81,12 @@ Using such a bus for the control of a vehicle on small embedded hardware adds fu
 These requirements lead to the design goals and philosophy of DroneCAN [1].
 
 ## III. Overview of the DroneCAN Protocol Stack
-- A. Design Goals
+### 3.1. Design Goals
+The CAN bus already removes the first two limitations of point-to-point wiring: the number of devices is no longer limited by the number of controller ports, and one interface and one type of cabling serve all of them. However, CAN defines no common services, and sharing a single medium among all devices brings problems of its own, such as single points of failure, payloads that exceed the size of a frame, and the demands for redundancy and low latency. The design goals of DroneCAN address these two groups of problems [1].
+
+To fill the gap in common services of CAN, DroneCAN defines standard messages and services for the functions that every vehicle needs: discovering the nodes on the network, configuring a node, updating its firmware, monitoring its status, synchronising clocks and assigning node IDs automatically [1]. The protocol keeps simple and its computational requirements low, because the devices on the bus range from microcontrollers with very little memory and processing power to high-performance computers running Linux [1]. The specification is fully open, and its reference implementations are open source under the MIT licence [1].
+
+The remaining goals address the problems of sharing one medium. A master node that controls access to the bus would be a single point of failure, so DroneCAN has no master and gives all nodes the same communication rights. A classical CAN frame carries at most 8 bytes of data [4], which is too little for the GNSS solutions and three-dimensional vectors that a vehicle needs, so DroneCAN splits such data over several frames and reassembles it at the receiver; the application hands over and receives complete data structures and does not have to handle this itself. A failure on the shared bus affects every device, so DroneCAN also supports redundant interfaces and redundant nodes. Finally, because all devices share the same bandwidth, the data of time-critical control loops must still arrive quickly, so DroneCAN aims at high throughput and low latency [1].
 - B. The Three Layers
   - 1. Layer 1: Physical Layer
   - 2. Layer 2: Data-Link and Transport Layer

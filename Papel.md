@@ -80,20 +80,27 @@ Using such a bus for the control of a vehicle on small embedded hardware adds fu
 
 These requirements lead to the design goals and philosophy of DroneCAN [1].
 
-## III. Overview of the DroneCAN Protocol Stack
+## 3. Overview: How to design DroneCAN
 ### 3.1. Design Goals
 The CAN bus already removes the first two limitations of point-to-point wiring: the number of devices is no longer limited by the number of controller ports, and one interface and one type of cabling serve all of them. However, CAN defines no common services, and sharing a single medium among all devices brings problems of its own, such as single points of failure, payloads that exceed the size of a frame, and the demands for redundancy and low latency. The design goals of DroneCAN address these two groups of problems [1].
 
 To fill the gap in common services of CAN, DroneCAN defines standard messages and services for the functions that every vehicle needs: discovering the nodes on the network, configuring a node, updating its firmware, monitoring its status, synchronising clocks and assigning node IDs automatically [1]. The protocol keeps simple and its computational requirements low, because the devices on the bus range from microcontrollers with very little memory and processing power to high-performance computers running Linux [1]. The specification is fully open, and its reference implementations are open source under the MIT licence [1].
 
 The remaining goals address the problems of sharing one medium. A master node that controls access to the bus would be a single point of failure, so DroneCAN has no master and gives all nodes the same communication rights. A classical CAN frame carries at most 8 bytes of data [4], which is too little for the GNSS solutions and three-dimensional vectors that a vehicle needs, so DroneCAN splits such data over several frames and reassembles it at the receiver; the application hands over and receives complete data structures and does not have to handle this itself. A failure on the shared bus affects every device, so DroneCAN also supports redundant interfaces and redundant nodes. Finally, because all devices share the same bandwidth, the data of time-critical control loops must still arrive quickly, so DroneCAN aims at high throughput and low latency [1].
-- B. The Three Layers
-  - 1. Layer 1: Physical Layer
-  - 2. Layer 2: Data-Link and Transport Layer
-  - 3. Layer 3: Application Layer
-- C. Network Model: Peer Network, Node IDs, No Bus Master
-- D. Communication Semantics: Publish/Subscribe and Services
-- E. From UAVCAN v0 to DroneCAN: The 2022 Split
+
+### 3.2. Network Model and Communication Methods
+A DroneCAN network is a decentralised peer network in which every device on the bus has a unique numeric node ID, with valid values from 1 to 127 [2], [4]. Each message and service has a data type ID that identifies its data structure, and the node ID in a message identifies its source, so that messages of the same type sent by redundant nodes can be told apart [2].
+
+Nodes communicate mainly by message broadcasting, which follows the publish/subscribe model and serves one-to-many and many-to-many communication [2]. In addition, service invocation provides a request/response exchange between exactly two nodes and is typically used for parameter updates, file transfer and firmware update [2].
+
+### 3.3. Layer Structure
+DroneCAN builds on the physical and data-link layers of CAN, which provide the bus and the frames, and adds a transport layer and an application layer (Fig. 2).
+
+The transport layer sends each piece of data, that is, a message, a service request or a service response, in CAN frames, splitting it over several frames when it does not fit into one. The 29-bit identifier of each frame contains the priority, the data type ID and the node ID, and the receiver puts the frames back together into the complete data [4]. The transport layer can also run over CAN FD, UDP multicast and MAVLink 2 messages [5]–[7].
+
+The application layer defines the data structures of messages and services in the Data Structure Description Language (DSDL) and, on top of them, provides standard high-level functions such as node discovery and health monitoring [2].
+
+The following chapters describe these layers in detail, starting with CAN.
 
 ## IV. Layer 1: Physical Layer
 - A. Controller Area Network (CAN) Fundamentals

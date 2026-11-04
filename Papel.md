@@ -172,21 +172,21 @@ DroneCAN hereda de CAN las siguientes propiedades:
 
 Sin embargo, CAN solo ofrece un transporte básico de tramas. Todo lo demás, como dividir los datos largos, asignar la prioridad y el significado a los identificadores y gestionar la red, lo aportan las capas superiores de DroneCAN, es decir, la capa de transporte y la capa de aplicación.
 
-## V. DroneCAN Transport Layer
-### A. Transfer Types: Message, Anonymous and Service
-### B. 29-Bit Identifier Layout
-#### 1. Message Frames
-#### 2. Anonymous Message Frames and the Discriminator
-#### 3. Service Frames
-#### 4. Worked Example
-### C. Tail Byte and Transfer ID
-### D. Multi-Frame Transfers
-#### 1. Decomposition and Reassembly
-#### 2. Transfer CRC and Toggle Bit
-#### 3. Frame-Count Calculation
-### E. Timing Rules and Timeouts
-### F. Redundant Interfaces: Simultaneous Transmission and Deduplication
-### G. Alternative Transports (CAN FD, UDP Multicast, MAVLink Tunnel)
+## V. Capa de transporte de DroneCAN
+### A. Tipos de transferencia: mensaje, anónimo y servicio
+### B. Estructura del identificador de 29 bits
+#### 1. Tramas de mensaje
+#### 2. Tramas de mensaje anónimo y el discriminador
+#### 3. Tramas de servicio
+#### 4. Ejemplo práctico
+### C. Byte de cola e ID de transferencia
+### D. Transferencias de múltiples tramas
+#### 1. Descomposición y reensamblaje
+#### 2. CRC de transferencia y bit de conmutación
+#### 3. Cálculo del recuento de tramas
+### E. Reglas de temporización y tiempos de espera (timeouts)
+### F. Interfaces redundantes: transmisión simultánea y deduplicación
+### G. Transportes alternativos (CAN FD, UDP Multicast, MAVLink Tunnel)
 
 ## VI. DroneCAN Application Layer
 ### A. Data Structure Description Language (DSDL)

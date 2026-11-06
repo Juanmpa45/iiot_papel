@@ -100,6 +100,7 @@ La capa de aplicación define las estructuras de datos de los mensajes y los ser
 
 Los capítulos siguientes describen estas capas en detalle, empezando por CAN.
 
+
 ## 4. CAN: Physical and Data-Link Layers
 ### 4.1. Overview of CAN
 CAN (Controller Area Network) es un bus serie en el que todos los nodos están conectados en paralelo a un mismo par de cables. Una trama de datos no contiene la dirección del emisor ni la del receptor: el identificador indica el contenido de la trama. Cada nodo del bus usa el identificador para decidir si la trama le interesa. Por eso, al conectar o desconectar un nodo no hace falta reconfigurar los demás.
@@ -201,11 +202,33 @@ Sin embargo, CAN solo ofrece un transporte básico de tramas. Todo lo demás, co
 #### 5. Time Synchronisation
 #### 6. Debugging and Emergency Functions (Panic)
 
-## VII. Reliability and Safety Mechanisms
-### A. Fault Model (noise, corrupted frames, node failure, bus failure, malicious node)
-### B. Protection Against Each Fault (table: fault, mechanism, layer)
-### C. Redundancy: Interfaces, Nodes and Services
-### D. Limits of the Protection (authentication, attacks, experimental attacks, implementation dependence)
+## 7. Fiabilidad y seguridad en DroneCAN
+Un fallo de CAN puede causar daños graves, y como todos los dispositivos comparten el mismo bus, un fallo puede afectar a toda la red. Por eso conviene saber qué fallos se esperan y quién los cubre: CAN o los mecanismos propios de DroneCAN. Los fallos se agrupan según el lugar donde ocurren:
+
+### 7.1. Modelo de fallos
+Los fallos de comunicación y los ataques intencionados son un problema constante en los sistemas de información actuales. En una red CAN, todos los dispositivos comparten un mismo bus, por lo que un fallo puede afectar a toda la red. Los fallos más comunes se agrupan según el lugar donde ocurren:
+
+- **Fallos de transmisión:** el ruido o las interferencias electromagnéticas cambian un bit durante la transmisión. CAN reduce el efecto del ruido con la transmisión diferencial, y detecta el error con el CRC y las tramas de error, que provocan una retransmisión. Sin embargo, CAN comprueba cada trama por separado, y DroneCAN divide los datos largos en varias tramas. Por eso DroneCAN añade un CRC para el conjunto de los datos, que se comprueba cuando el receptor une las tramas, y un bit de alternancia (toggle bit) que detecta las tramas duplicadas [4].
+- **Fallos de un nodo**: un nodo se comporta de forma anómala o deja de responder. Los contadores de errores de CAN aíslan al nodo que provoca errores en el bus (bus off), pero CAN no detecta que un nodo ha dejado de enviar. DroneCAN añade un mecanismo de latido (heartbeat): cada nodo publica periódicamente un mensaje de estado, y si un nodo no lo publica durante cierto tiempo, se considera desconectado [9]. Además, DroneCAN permite que haya en la misma red nodos redundantes con la misma función, por ejemplo dos receptores GNSS. Cada mensaje lleva el ID del nodo que lo envía, así que el receptor puede distinguir los datos de cada nodo [2]. Si un nodo falla, el receptor puede usar los datos del otro nodo y el sistema sigue funcionando.
+- **Fallos del bus, del cableado o de la alimentación:** cuando hay un cortocircuito, un circuito abierto o un problema de alimentación, el bus deja de funcionar y toda la red de comunicación se detiene. El CAN de alta velocidad (ISO 11898-2) no tiene ningún mecanismo para responder a este fallo; solo algunos transceptores de CAN de baja velocidad pueden seguir funcionando con un solo cable, aunque con menos protección contra el ruido. DroneCAN permite usar varios buses CAN: cada nodo envía cada dato por todos los buses a la vez y el receptor descarta las copias repetidas. Así, la redundancia de buses aumenta la tolerancia a fallos del sistema. Además, DroneCAN exige proteger con fusibles la alimentación del bus, para que un cortocircuito no deje sin energía a toda la red [4], [11].
+
+### 7.2. Redundancia y supervisión del estado
+DroneCAN ofrece mecanismos de redundancia y de supervisión del estado, para tolerar, detectar y responder a los fallos. La redundancia tiene tres niveles:
+
+- Buses: DroneCAN permite usar hasta tres buses CAN [11]. Los buses se dividen en principal y de respaldo: normalmente todos los dispositivos se conectan al bus principal, y los dispositivos críticos con interfaces redundantes se conectan también al bus de respaldo, para seguir comunicando cuando falla el bus principal, con una degradación gradual [11].
+- Nodos: los nodos con la misma función se distinguen por su ID de nodo, y la aplicación del receptor puede decidir qué nodo usar según su ID [2].
+- Servicios de la red: servicios como la asignación de ID de nodo y la sincronización horaria también ofrecen redundancia, para evitar puntos únicos de fallo [9].
+
+Además de detectar los nodos desconectados, estos mensajes permiten que los nodos receptores conozcan la situación del nodo emisor: los problemas que el propio nodo detecta, si hay un fallo o solo una indisponibilidad temporal, y si el nodo se ha reiniciado. Esta información sirve para que el sistema decida cómo reaccionar, por ejemplo dejar de usar los datos de un nodo con fallos, usar los de un nodo redundante o activar una acción de seguridad (failsafe) [9].
+
+Si un nodo detecta un fallo que no puede recuperar, puede difundir un mensaje de emergencia (panic) para que el sistema se apague rápidamente [9]. Este mensaje es de la capa de aplicación y es distinto de la trama de error de CAN: la trama de error la envía automáticamente el controlador CAN y solo afecta a una trama, mientras que el mensaje de emergencia indica que todo el sistema tiene un fallo que no se puede recuperar.
+
+### 7.3. Límites de la protección
+La causa principal de los problemas de seguridad es la falta de autenticación y de cifrado. CAN es una red de difusión sin direcciones de origen ni de destino: cualquier nodo puede escuchar todas las tramas y enviar tramas con cualquier identificador, y el identificador solo indica el contenido, no quién envía la trama [20]. La capa de transporte de DroneCAN tampoco define campos de autenticación ni de cifrado [4], por lo que el ID de nodo es una afirmación que nadie comprueba.
+
+DroneCAN se centra en ofrecer una comunicación fiable y funciones estándar sobre CAN, y no corrige los problemas de seguridad de la capa de enlace de datos de CAN. Por eso, los ataques descritos en las redes CAN, como la denegación de servicio, la inyección de mensajes y la repetición de mensajes [20], [22], también son posibles en DroneCAN. Un informe técnico lo confirma: un atacante conectó un ordenador Raspberry Pi 4 al bus de un cuadricóptero y, inyectando tramas, pudo parar los motores y perturbar el vuelo [23].
+
+Una revisión de 2018 sobre la seguridad de CAN en el ámbito del automóvil concluye que CAN no cumple ninguno de los tres criterios de confidencialidad, integridad y disponibilidad. La misma revisión señala que, hasta esa fecha, ninguna de las contramedidas propuestas había sido aceptada por la industria y la academia, porque todas añaden retardo, ocupan ancho de banda o no son compatibles con los controladores CAN estándar [20].
 
 ## VIII. Comparison with Related Technologies
 ### A. DroneCAN and Cyphal

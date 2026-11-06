@@ -4,7 +4,7 @@
 - **Keywords**
 
 ## 1. Introducción
-### 1.1.Contexto: de controladores únicos a sistemas distribuidos
+### 1.1. Contexto: de controladores únicos a sistemas distribuidos
 Un vehículo aéreo no tripulado (UAV) moderno ya no es un único controlador conectado con cables a unos pocos actuadores. Es un sistema embebido distribuido, en el que varios dispositivos, cada uno con su propio procesador, cooperan intercambiando datos de forma continua durante el vuelo. Un multirrotor típico combina un controlador de vuelo (la placa de circuito que ejecuta el software del piloto automático) con uno o más receptores GNSS (receptores de navegación por satélite, como el GPS), un magnetómetro (brújula), un sensor de velocidad del aire, un telémetro, varios variadores electrónicos de velocidad (ESC, circuitos que regulan la velocidad de los motores), un monitor de batería y, de forma opcional, un ordenador complementario (un ordenador adicional para tareas de alto nivel, como el procesamiento de imágenes). La especificación de DroneCAN describe los procesadores de estos sistemas como muy variados, desde ordenadores de a bordo de alto rendimiento hasta microcontroladores con recursos muy limitados [1]. Además, los dispositivos suelen venir de fabricantes distintos, y por eso la misma especificación insiste en la compatibilidad entre fabricantes [11].
 
 La forma convencional de conectar estos dispositivos es el cableado punto a punto: cada dispositivo se conecta al controlador de vuelo mediante un puerto y un cable propios, usando la interfaz que ofrece el dispositivo. Esta solución es fácil de implementar, pero tiene tres limitaciones. Primero, el número de puertos lo determina el hardware, y por tanto limita el número de actuadores y sensores que puede llevar un vehículo. Segundo, cada tipo de interfaz necesita su propio cableado y su propio controlador (driver), lo que aumenta el peso, el número de conectores y el número de posibles puntos de fallo. Tercero, estas interfaces no ofrecen servicios comunes, como el descubrimiento de dispositivos, la supervisión del estado o la actualización del firmware.
@@ -42,6 +42,7 @@ El vehículo también se comunica con el piloto y con otros ordenadores. Un pilo
 
 La Fig. 1 muestra los principales enlaces de comunicación del controlador de vuelo. Los actuadores y los módulos de sensores, como el módulo GNSS, se conectan directamente a puertos dedicados del controlador, y las salidas también pueden ser nodos DroneCAN, por ejemplo controladores de motor DroneCAN [14]. A la estación de tierra y al ordenador complementario se llega mediante enlaces como la radio de telemetría, un cable serie, un cable Ethernet o Wi-Fi [14].
 
+![2.1.](./Figuras/Fig_01_2-1.png)
 Fig. 1. Enlaces de comunicación típicos alrededor de un controlador de vuelo.
 
 ### 2.2. Interfaces punto a punto (PWM, UART, I2C, SPI)
@@ -100,9 +101,12 @@ La capa de aplicación define las estructuras de datos de los mensajes y los ser
 
 Los capítulos siguientes describen estas capas en detalle, empezando por CAN.
 
+![3.3.](./Figuras/Fig_02_3-3.png)
+Fig. 2. Capas de DroneCAN.
 
-## 4. CAN: Physical and Data-Link Layers
-### 4.1. Overview of CAN
+
+## 4. CAN: Capas física y de enlace de datos
+### 4.1. Visión general de CAN
 CAN (Controller Area Network) es un bus serie en el que todos los nodos están conectados en paralelo a un mismo par de cables. Una trama de datos no contiene la dirección del emisor ni la del receptor: el identificador indica el contenido de la trama. Cada nodo del bus usa el identificador para decidir si la trama le interesa. Por eso, al conectar o desconectar un nodo no hace falta reconfigurar los demás.
 
 CAN no tiene nodo maestro: cuando el bus está libre, cualquier nodo puede transmitir. Si varios nodos transmiten a la vez, el identificador también indica la prioridad, y el nodo con mayor prioridad sigue transmitiendo. El nodo que pierde el arbitraje espera y vuelve a enviar su trama más tarde.
@@ -126,10 +130,16 @@ La sincronización se hace de dos maneras. Al comienzo de cada trama, todos los 
 #### 4.3.1. Acceso al bus y arbitraje
 Un nodo solo empieza a transmitir cuando el bus está libre. Si varios nodos empiezan a la vez, cada uno envía su identificador bit a bit, empezando por el bit más significativo, y compara cada bit enviado con el bit que lee en el bus. Si un nodo envía un bit recesivo (1) y lee un bit dominante (0), sabe que otro nodo tiene mayor prioridad. Entonces deja de transmitir, pasa a recibir la trama y lo vuelve a intentar cuando el bus esté libre. Como el bit dominante es el 0, el identificador con menor valor numérico tiene mayor prioridad. La trama ganadora no se destruye ni se retrasa. Para que el arbitraje funcione, un mismo identificador no puede ser enviado a la vez por dos nodos.
 
+![4.3.1](./Figuras/Fig_03_4-3-1.png)
+Fig. 3. Arbitraje de CAN.
+
 #### 4.3.2. Formato de las tramas
 La trama de datos es la trama que transporta la información. Está formada por los siguientes campos: un bit de inicio, el campo de arbitraje (el identificador), el campo de control (que indica cuántos bytes de datos hay), el campo de datos, el campo CRC, el campo de confirmación (ACK) y los bits de fin de trama. El campo de datos tiene como máximo 8 bytes. Además, CAN define otras tramas: la trama remota, que pide a otro nodo que envíe una trama de datos, la trama de error y la trama de sobrecarga.
 
 El identificador puede tener 11 bits (formato estándar, CAN 2.0A) o 29 bits (formato extendido, CAN 2.0B). Un bit del campo de arbitraje indica cuál de los dos formatos se usa. DroneCAN usa el formato extendido de 29 bits.
+
+![4.3.2](./Figuras/Fig_04_4-3-2.png)
+Fig. 4. Formato trama de CAN.
 
 #### 4.3.3. Detección y gestión de errores
 CAN detecta cinco tipos de errores:
@@ -203,8 +213,6 @@ Sin embargo, CAN solo ofrece un transporte básico de tramas. Todo lo demás, co
 #### 6. Debugging and Emergency Functions (Panic)
 
 ## 7. Fiabilidad y seguridad en DroneCAN
-Un fallo de CAN puede causar daños graves, y como todos los dispositivos comparten el mismo bus, un fallo puede afectar a toda la red. Por eso conviene saber qué fallos se esperan y quién los cubre: CAN o los mecanismos propios de DroneCAN. Los fallos se agrupan según el lugar donde ocurren:
-
 ### 7.1. Modelo de fallos
 Los fallos de comunicación y los ataques intencionados son un problema constante en los sistemas de información actuales. En una red CAN, todos los dispositivos comparten un mismo bus, por lo que un fallo puede afectar a toda la red. Los fallos más comunes se agrupan según el lugar donde ocurren:
 
@@ -218,6 +226,11 @@ DroneCAN ofrece mecanismos de redundancia y de supervisión del estado, para tol
 - Buses: DroneCAN permite usar hasta tres buses CAN [11]. Los buses se dividen en principal y de respaldo: normalmente todos los dispositivos se conectan al bus principal, y los dispositivos críticos con interfaces redundantes se conectan también al bus de respaldo, para seguir comunicando cuando falla el bus principal, con una degradación gradual [11].
 - Nodos: los nodos con la misma función se distinguen por su ID de nodo, y la aplicación del receptor puede decidir qué nodo usar según su ID [2].
 - Servicios de la red: servicios como la asignación de ID de nodo y la sincronización horaria también ofrecen redundancia, para evitar puntos únicos de fallo [9].
+
+![7.2.](./Figuras/Fig_05-7-2.png)
+Fig. 5. Rebundancia de buses.
+
+Para supervisar el estado de los nodos, DroneCAN usa un mecanismo de latido (heartbeat): cada nodo publica periódicamente el mensaje NodeStatus, como mínimo una vez por segundo. Si un nodo no lo publica durante 3 s, los demás nodos lo consideran desconectado [9].
 
 Además de detectar los nodos desconectados, estos mensajes permiten que los nodos receptores conozcan la situación del nodo emisor: los problemas que el propio nodo detecta, si hay un fallo o solo una indisponibilidad temporal, y si el nodo se ha reiniciado. Esta información sirve para que el sistema decida cómo reaccionar, por ejemplo dejar de usar los datos de un nodo con fallos, usar los de un nodo redundante o activar una acción de seguridad (failsafe) [9].
 
@@ -235,14 +248,57 @@ Una revisión de 2018 sobre la seguridad de CAN en el ámbito del automóvil con
 ### B. DroneCAN and MAVLink
 ### C. DroneCAN and Point-to-Point Interfaces
 
-## IX. Open Challenges and Research Directions
-### A. Security and Intrusion Detection
-### B. Quantitative Evaluation
-### C. Migration to CAN FD
-### D. Coexistence with Cyphal
-### E. Fault Isolation on a Shared Bus
-### F. Evolution of the Specifications
+## 9. Retos abiertos y líneas de investigación
+### 9.1. Seguridad: autenticación y detección de intrusiones
+DroneCAN no autentica al emisor de los mensajes. Una de las limitaciones es el tamaño de la trama: DroneCAN se basa en CAN clásico, donde una trama solo lleva 8 bytes de datos. MAVLink 2 añade a sus mensajes una firma opcional de 13 bytes para autenticarlos [16]. CAN FD permite hasta 64 bytes por trama [7].
 
-## X. Conclusion
+Añadir la autenticación sin romper la compatibilidad con las redes ya desplegadas es un problema abierto de diseño. Una opción sería enviar la firma en un mensaje específico de fabricante. Otra sería incluirla en la capa de aplicación. La primera dificulta la interoperabilidad entre fabricantes y aumenta la carga del bus. La segunda exige modificar los tipos de datos o usar más tramas por mensaje, con más latencia.
 
-## References
+Como alternativa a añadir autenticación, que exige modificar el protocolo, Kim et al. proponen un sistema de detección de intrusiones (IDS) para redes UAVCAN. Este sistema reconstruye las transferencias y extrae diez características a partir de los datos y de las infracciones de las reglas de transferencia [21]. En diez escenarios de ataque de un conjunto de datos público [23], su mejor configuración obtiene una exactitud, una precisión y una exhaustividad medias del 99,89 %, el 99,96 % y el 99,88 %, respectivamente [21]. Estos resultados proceden de un único estudio y de un único conjunto de datos, por lo que se necesitan más datos para validarlos.
+
+### 9.2. Migración a CAN FD
+DroneCAN se basa en CAN clásico, cuya velocidad máxima es de 1 Mbit/s y cuyas tramas llevan 8 bytes de datos. La especificación también admite CAN FD con pocos cambios: las tramas llevan hasta 64 bytes y, en la fase de datos, la velocidad puede subir hasta 8 Mbit/s según el hardware [7]. Sin embargo, las recomendaciones de hardware de DroneCAN solo llegan a 1 Mbit/s [11], y las velocidades más altas exigen más al cableado y a la calidad de la señal: las derivaciones deben ser más cortas, las oscilaciones y reflexiones de la señal son más difíciles de controlar y los transceptores deben ser más precisos. Además, las tramas FD solo se pueden usar si todos los nodos del bus admiten CAN FD.
+
+Las tramas más grandes permiten que muchas transferencias quepan en una sola trama. Por ejemplo, en la asignación dinámica de ID de nodo, con CAN FD toda la información cabe en una petición y una respuesta, y la especificación indica que solo CAN FD ofrece intercambios de asignación totalmente fiables [9]. El espacio adicional también podría servir para añadir campos nuevos, como una firma de autenticación.
+
+Cyphal ya considera CAN FD su transporte principal [15], pero define un formato de trama distinto [4], [15] y es un protocolo independiente. Por eso, cambiar a Cyphal tampoco resuelve el problema de la compatibilidad con los dispositivos DroneCAN ya desplegados.
+
+### 9.3. Aislamiento de fallos en un bus compartido
+Todos los nodos de un bus DroneCAN comparten el mismo medio, por lo que un nodo que se comporta mal puede afectar a todos los demás. CAN ya incluye un mecanismo de aislamiento: los contadores de errores desconectan del bus a los nodos que generan errores (estado bus off). Pero este mecanismo solo reacciona a los errores, y un nodo que envía tramas correctas no genera errores. Además, por la arbitración por prioridad, un nodo malicioso con la máxima prioridad que esté siempre activo impide que los demás se comuniquen [20]. 
+
+En 2022, investigadores del Hacking and Countermeasure Research Lab de la Universidad de Corea conectaron un ordenador Raspberry Pi 4 al bus de un cuadricóptero con un Pixhawk 4 y cuatro controladores de motor, y le enviaron, a intervalos fijos, tramas con el identificador de RawCommand, el mensaje que ordena la velocidad a los motores, y con los datos a cero. Los motores se detuvieron mientras duró el ataque. Esto demuestra que un nodo añadido al bus, sin autenticación, puede controlar los motores con tramas correctas, y que el bus no lo desconectó durante el ataque [23].
+
+Además, el propio mecanismo de aislamiento puede usarse contra un nodo sano. En 2017, Palanca y Zanero, del Politecnico di Milano, y sus coautores conectaron un nodo oculto al bus de un Alfa Romeo Giulietta de 2012 [24]. Este nodo sobrescribía bits para provocar tramas de error, y tras varios errores el nodo víctima pasaba al estado bus off y dejaba de estar disponible. Esto demuestra que un atacante puede desconectar a un nodo legítimo sin enviar tramas completas, usando el propio confinamiento de errores de CAN [24].
+
+## 10. Resumen
+Un dron moderno es un sistema distribuido: el controlador de vuelo, los sensores y los controladores de motor deben intercambiar datos de forma continua y fiable. DroneCAN resuelve este problema con una arquitectura en capas sobre el bus CAN. CAN aporta la capa física y la capa de enlace de datos, pero solo ofrece un transporte básico de tramas. La capa de transporte de DroneCAN añade el identificador de 29 bits, la división de los datos largos en varias tramas y las interfaces redundantes. La capa de aplicación añade los tipos de datos y funciones como el estado de nodo, la asignación dinámica de ID y la sincronización horaria [1]–[11].
+
+El objetivo de diseño de DroneCAN es la fiabilidad. Combina los mecanismos de CAN, como la detección de errores y la desconexión de los nodos averiados, con la redundancia de buses, de nodos y de servicios de red, y supervisa el estado de los nodos con los mensajes NodeStatus y Panic [9]. Estos mecanismos protegen frente a fallos de transmisión y de nodos. Sus límites son que algunos fallos de cableado o de alimentación pueden detener toda la red, y que DroneCAN no autentica al emisor ni cifra los datos. Por eso no resuelve los problemas de seguridad que CAN ya tenía: los ataques de inyección, repetición y denegación de servicio [23].
+
+En conjunto, DroneCAN es un protocolo ligero y fiable frente a fallos accidentales, pero ofrece poca protección frente a ataques intencionados.
+
+## Referencias
+[1] DroneCAN Development Team, “1. Introduction,” in *DroneCAN Specification*. Consultado: oct. 2026. [En línea]. Disponible en: https://dronecan.github.io/Specification/ (página generada el 26 ago. 2025).
+[2] DroneCAN Development Team, “2. Basic concepts,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[3] DroneCAN Development Team, “3. Data structure description language,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[4] DroneCAN Development Team, “4.1 CAN bus transport layer,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[5] DroneCAN Development Team, “4.2 UDP bus transport layer,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[6] DroneCAN Development Team, “4.3 MAVLink bus transport layer,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[7] DroneCAN Development Team, “4.4 CANFD bus transport layer,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[8] DroneCAN Development Team, “5. Application level conventions,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[9] DroneCAN Development Team, “6. Application level functions,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[10] DroneCAN Development Team, “7. List of standard data types,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[11] DroneCAN Development Team, “8. Hardware design recommendations,” in *DroneCAN Specification*. [En línea]. Disponible en: https://dronecan.github.io/Specification/
+[12] DroneCAN project, “DroneCAN: a lightweight protocol for aerospace and robotic applications,” sitio web del proyecto. Consultado: oct. 2026. [En línea]. Disponible en: https://dronecan.github.io/
+[13] PX4 Autopilot Project, “CAN (DroneCAN & Cyphal),” in *PX4 User Guide*. Consultado: oct. 2026. [En línea]. Disponible en: https://docs.px4.io/
+[14] PX4 Autopilot Project, “Basic concepts,” in *PX4 User Guide* (rama principal). [En línea]. Disponible en: https://docs.px4.io/
+[15] OpenCyphal Development Team, *Cyphal Specification v1.0*, rev. 16 may 2025. [En línea]. Disponible en: https://opencyphal.org/specification
+[16] A. Koubâa, A. Allouch, M. Alajlan, Y. Javed, A. Belghith, and M. Khalgui, “Micro Air Vehicle Link (MAVLink) in a nutshell: A survey,” *IEEE Access*, vol. 7, pp. 87658–87680, 2019, arXiv:1906.10641.
+[17] M. Ghamari, P. Rangel, M. Mehrubeoglu, G. S. Tewolde, and R. S. Sherratt, “Unmanned aerial vehicle communications for civil applications: A review,” *IEEE Access*, vol. 10, pp. 102492–102531, 2022, doi: 10.1109/ACCESS.2022.3208571.
+[18] N. Aliane, “A survey of open-source UAV autopilots,” *Electronics*, vol. 13, no. 23, Art. no. 4785, 2024.
+[19] N. Ravi and M. El-Sharkawy, “Integration of UAVs with real time operating systems using UAVCAN,” in *Proc. IEEE 10th Annu. Ubiquitous Comput., Electron. Mobile Commun. Conf. (UEMCON)*, 2019, pp. 600–605, doi: 10.1109/UEMCON47517.2019.8993011.
+[20] M. Bozdal, M. Samie, and I. Jennions, “A survey on CAN bus protocol: Attacks, challenges, and potential solutions,” in *Proc. Int. Conf. Comput., Electron. Commun. Eng. (iCCECE)*, Southend, Reino Unido, ago. 2018, doi: 10.1109/iCCECOME.2018.8658720.
+[21] S. Kim, H. Im, J. Choi, and S. Lee, “Protocol-aware feature-based intrusion detection system for UAVCAN networks,” *Sensors*, vol. 26, no. 19, Art. no. 6061, 2026, doi: 10.3390/s26196061.
+[22] O. Y. Al-Jarrah, C. Maple, M. Dianati, D. Oxtoby, and A. Mouzakitis, “Intrusion detection systems for intra-vehicle networks: A review,” *IEEE Access*, vol. 7, pp. 21266–21289, 2019, doi: 10.1109/ACCESS.2019.2894183.
+[23] D. Kim, Y. Song, S. Kwon, H. Kim, J. D. Yoo, and H. K. Kim, “UAVCAN dataset description,” Hacking and Countermeasure Research Lab, Korea University, arXiv:2212.09268v2 [cs.CR], abr. 2024. [En línea]. Disponible en: https://arxiv.org/abs/2212.09268
+[24] A. Palanca, E. Evenchick, F. Maggi, and S. Zanero, “A stealth, selective, link-layer denial-of-service attack against automotive networks,” in *Detection of Intrusions and Malware, and Vulnerability Assessment (DIMVA 2017)*, Lecture Notes in Computer Science, vol. 10327. Cham, Suiza: Springer, 2017, pp. 185–206, doi: 10.1007/978-3-319-60876-1_9.

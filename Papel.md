@@ -30,53 +30,53 @@ DroneCAN es una de las varias tecnologías de comunicación disponibles para qui
 
 UAVCAN fue el protocolo abierto original para la comunicación basada en CAN entre los componentes de un vehículo. En 2022 el proyecto se dividió en dos: UAVCAN v0 pasó a llamarse DroneCAN, y UAVCAN v1 pasó a llamarse Cyphal [13]. Los dos descendientes comparten objetivos de diseño, como una red sin nodo maestro y la comunicación tanto de publicación/suscripción como de petición/respuesta [1], [15], pero definen formatos de trama CAN distintos [4], [15], y por eso son protocolos separados, no versiones uno del otro. Las publicaciones anteriores a la división que usan el nombre UAVCAN, como [19], se refieren a lo que hoy es DroneCAN. MAVLink es independiente de esta línea: conecta el vehículo con las estaciones de tierra y los ordenadores complementarios, no los componentes dentro del vehículo [16], [18], y solo coincide con DroneCAN cuando las tramas DroneCAN se transportan dentro de mensajes MAVLink 2 [6].
 
-## 2. Communication Interfaces in UAVs
-### 2.1. Architecture of UAV
-The core of a UAV is the flight controller (FC), which communicates with the surrounding devices to exchange data and commands. The flight controller hardware runs the autopilot, that is, flight stack software on a real-time operating system (RTOS), which stabilises the vehicle and carries out commands and missions [14]. The surrounding devices fall into four groups: sensors, actuators, the power supply, and links to the pilot and to other computers.
+## 2. Interfaces de comunicación en los UAV
+### 2.1. Arquitectura de un UAV
+El núcleo de un UAV es el controlador de vuelo (FC), que se comunica con los dispositivos que lo rodean para intercambiar datos y órdenes. El hardware del controlador de vuelo ejecuta el piloto automático, es decir, el software de vuelo (flight stack) sobre un sistema operativo en tiempo real (RTOS), que estabiliza el vehículo y ejecuta las órdenes y las misiones [14]. Los dispositivos que lo rodean se dividen en cuatro grupos: sensores, actuadores, la fuente de alimentación, y los enlaces con el piloto y con otros ordenadores.
 
-The flight controller uses outputs to drive actuators: motors, flight surfaces such as ailerons and flaps, and payloads such as camera triggers or grippers [14]. A motor is driven through an *electronic speed controller* (ESC), which converts the signal from the flight controller into the appropriate level of power for the motor [14].
+El controlador de vuelo usa salidas para accionar los actuadores: motores, superficies de vuelo como los alerones y los flaps, y cargas útiles como los disparadores de cámara o las pinzas [14]. Un motor se acciona mediante un variador electrónico de velocidad (ESC), que convierte la señal del controlador de vuelo en el nivel de potencia adecuado para el motor [14].
 
-The vehicle is usually powered by a lithium-polymer battery connected through a power module, which supplies the flight controller and the ESCs separately [14].
+El vehículo suele alimentarse con una batería de polímero de litio conectada mediante un módulo de potencia, que alimenta por separado al controlador de vuelo y a los ESC [14].
 
-The vehicle also communicates with the pilot and with other computers. A pilot can fly the vehicle with a radio control (RC) transmitter and a receiver on the vehicle [14]. A *ground control station* (GCS), such as QGroundControl, communicates with the vehicle through a *telemetry radio*, a bidirectional wireless data link [14].
+El vehículo también se comunica con el piloto y con otros ordenadores. Un piloto puede volar el vehículo con un transmisor de radiocontrol (RC) y un receptor instalado en el vehículo [14]. Una estación de control en tierra (GCS), como QGroundControl, se comunica con el vehículo mediante una radio de telemetría, un enlace de datos inalámbrico bidireccional [14].
 
-Fig. 1 shows the main communication links of the flight controller. Actuators and sensor modules such as the GNSS module are attached directly to dedicated ports of the controller, and the outputs can also be DroneCAN nodes, for example DroneCAN motor controllers [14]. The ground station and the companion computer are reached through links such as the telemetry radio, a serial cable, an Ethernet cable or Wi-Fi [14].
+La Fig. 1 muestra los principales enlaces de comunicación del controlador de vuelo. Los actuadores y los módulos de sensores, como el módulo GNSS, se conectan directamente a puertos dedicados del controlador, y las salidas también pueden ser nodos DroneCAN, por ejemplo controladores de motor DroneCAN [14]. A la estación de tierra y al ordenador complementario se llega mediante enlaces como la radio de telemetría, un cable serie, un cable Ethernet o Wi-Fi [14].
 
-Fig. 1. Typical communication links around a flight controller.
+Fig. 1. Enlaces de comunicación típicos alrededor de un controlador de vuelo.
 
-### 2.2. Point-to-Point Interfaces (PWM, UART, I2C, SPI)
-The traditional way to connect devices to a flight controller is to give each device its own dedicated interface on the controller, chosen to suit the kind of data that the device exchanges. These interfaces are hardware interfaces and signalling methods rather than application-level protocols: they define how electrical signals on the wires represent data, but not what the data mean. Four are in common use. Pulse-width modulation (PWM) sends a setpoint to an actuator over a single wire. A UART (universal asynchronous receiver-transmitter) is a serial link between two devices. I2C and SPI are short-distance serial buses on which the controller communicates with several peripheral chips or modules over shared wires. PWM and UART therefore connect exactly two devices, whereas I2C and SPI share wires among several, but in all four cases the connection is local to the controller’s own ports, and no common addressing or services extend across the vehicle.
+### 2.2. Interfaces punto a punto (PWM, UART, I2C, SPI)
+La forma tradicional de conectar dispositivos a un controlador de vuelo es dar a cada dispositivo su propia interfaz dedicada en el controlador, elegida según el tipo de datos que intercambia el dispositivo. Estas interfaces son interfaces de hardware y métodos de señalización, no protocolos de nivel de aplicación: definen cómo las señales eléctricas de los cables representan datos, pero no qué significan los datos. Hay cuatro de uso común. La modulación por ancho de pulso (PWM) envía una consigna a un actuador por un solo cable. Un UART (receptor-transmisor asíncrono universal) es un enlace serie entre dos dispositivos. I2C y SPI son buses serie de corta distancia, en los que el controlador se comunica con varios chips o módulos periféricos mediante cables compartidos. Por tanto, PWM y UART conectan exactamente dos dispositivos, mientras que I2C y SPI comparten los cables entre varios, pero en los cuatro casos la conexión es local, limitada a los puertos del propio controlador, y ningún direccionamiento ni servicio común se extiende por todo el vehículo.
 
-PWM is the simplest of them and is used for actuators. It encodes a setpoint, such as the desired motor speed, in the width of the pulses of a periodic signal, so one wire carries one setpoint in one direction, from the controller to one actuator. The output connectors of the controller are called ports, in PX4 they are MAIN and AUX [14]. The number of outputs is fixed by the hardware, typically six to eight [14].
+PWM es la más simple y se usa para los actuadores. Codifica una consigna, como la velocidad deseada del motor, en el ancho de los pulsos de una señal periódica, de modo que un cable transporta una consigna en un solo sentido, desde el controlador hasta un actuador. Los conectores de salida del controlador se llaman puertos; en PX4 son MAIN y AUX [14]. El número de salidas lo fija el hardware, normalmente entre seis y ocho [14].
 
-The serial interfaces suit devices that exchange data rather than receive a single setpoint. UART links are used for telemetry radios and companion computers [14], whereas I2C and SPI are used for sensors and other peripherals located close to the controller, SPI being the faster of the two. All three are simple and widely supported. Their main limit is range: I2C and SPI are designed for short connections, and a UART connects only two devices.
+Las interfaces serie son adecuadas para dispositivos que intercambian datos, en lugar de recibir una sola consigna. Los enlaces UART se usan para las radios de telemetría y los ordenadores complementarios [14], mientras que I2C y SPI se usan para sensores y otros periféricos situados cerca del controlador, y SPI es la más rápida de las dos. Las tres son simples y tienen un amplio soporte. Su principal límite es el alcance: I2C y SPI están pensados para conexiones cortas, y un UART conecta solo dos dispositivos.
 
-Point-to-point wiring therefore has three limitations:
+Por tanto, el cableado punto a punto tiene tres limitaciones:
 
-- The number of ports is fixed by the hardware [14], so each additional device needs another port and another cable.
-- Each interface type needs its own driver and cabling.
-- The interfaces define no common services such as device discovery, status monitoring or firmware update [9].
+El número de puertos lo fija el hardware [14], así que cada dispositivo adicional necesita otro puerto y otro cable.
+Cada tipo de interfaz necesita su propio controlador (driver) y su propio cableado.
+Las interfaces no definen servicios comunes, como el descubrimiento de dispositivos, la supervisión del estado o la actualización del firmware [9].
 
-### 2.3. MAVLink: Communication Between the Vehicle and Other Computers
-The interfaces described above connect individual devices to the flight controller. MAVLink addresses a different problem: communication between the vehicle and the other computers that supervise or assist it, namely the ground control station and the companion computer [16], [18]. The point-to-point interfaces thus serve communication between the flight controller and the devices inside the vehicle, whereas MAVLink serves communication between the vehicle and other computers. DroneCAN belongs to the first of these two problems: it connects the flight controller and the onboard devices over a shared CAN bus [12], [19].
+### 2.3. MAVLink: comunicación entre el vehículo y otros ordenadores
+Las interfaces descritas antes conectan dispositivos individuales con el controlador de vuelo. MAVLink resuelve un problema distinto: la comunicación entre el vehículo y los otros ordenadores que lo supervisan o lo ayudan, es decir, la estación de control en tierra y el ordenador complementario [16], [18]. Así, las interfaces punto a punto sirven para la comunicación entre el controlador de vuelo y los dispositivos del interior del vehículo, mientras que MAVLink sirve para la comunicación entre el vehículo y otros ordenadores. DroneCAN pertenece al primero de estos dos problemas: conecta el controlador de vuelo y los dispositivos de a bordo mediante un bus CAN compartido [12], [19].
 
-### 2.4. Summary of Requirements
-The limitations of point-to-point wiring lead directly to the following requirements for an intra-vehicle bus:
+### 2.4. Resumen de requisitos
+Las limitaciones del cableado punto a punto llevan directamente a los siguientes requisitos para un bus dentro del vehículo:
 
-- a shared medium to which many devices connect through one interface, so that the number of devices is not limited by the number of controller ports and each additional device does not need another cable;
-- one interface and one type of cabling for all device types, so that a single driver serves every device;
-- standard definitions of the high-level functions common to all nodes, such as discovery, status monitoring, configuration and firmware update.
+un medio compartido al que se conecten muchos dispositivos mediante una sola interfaz, de modo que el número de dispositivos no esté limitado por el número de puertos del controlador y cada dispositivo adicional no necesite otro cable;
+una sola interfaz y un solo tipo de cableado para todos los tipos de dispositivos, de modo que un único controlador (driver) sirva para todos;
+definiciones estándar de las funciones de alto nivel comunes a todos los nodos, como el descubrimiento, la supervisión del estado, la configuración y la actualización del firmware.
 
-Using such a bus for the control of a vehicle on small embedded hardware adds further requirements:
+Usar un bus así para el control de un vehículo con hardware embebido pequeño añade otros requisitos:
 
-- no single point of failure, and therefore no bus master (a node that controls access for all others);
-- support for redundant interfaces and redundant nodes;
-- low latency and high throughput for hard real-time control loops, that is, control loops that must meet strict timing deadlines;
-- a simple way to exchange payloads that exceed a single frame;
-- low computational requirements, down to resource-constrained microcontrollers;
-- an open specification with open reference implementations.
+ningún punto único de fallo y, por tanto, ningún maestro del bus (un nodo que controla el acceso de todos los demás);
+soporte para interfaces y nodos redundantes;
+baja latencia y alto caudal de datos para bucles de control de tiempo real estricto, es decir, bucles de control que deben cumplir plazos de tiempo estrictos;
+una forma sencilla de intercambiar datos que superan el tamaño de una sola trama;
+bajos requisitos de cómputo, hasta microcontroladores con recursos limitados;
+una especificación abierta con implementaciones de referencia abiertas.
 
-These requirements lead to the design goals and architecture of DroneCAN [1].
+Estos requisitos llevan a los objetivos de diseño y a la arquitectura de DroneCAN [1].
 
 ## 3. Design Goals and Architecture of DroneCAN
 ### 3.1. Design Goals
